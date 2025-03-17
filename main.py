@@ -1272,4 +1272,5 @@ def test_db():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Use Heroku's $PORT or default to 5000
+    app.run(host="0.0.0.0", port=port, debug=False)  # Disable debug mode for production
