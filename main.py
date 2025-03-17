@@ -3,6 +3,7 @@ import mysql.connector
 from flask_cors import CORS
 import math
 from fpdf import FPDF
+import os
 
 app = Flask(__name__)
 CORS(app)  # Allows frontend access to API
