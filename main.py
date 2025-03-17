@@ -4,6 +4,8 @@ from flask_cors import CORS
 import math
 from fpdf import FPDF
 import os
+import socks
+import socket
 
 app = Flask(__name__)
 CORS(app)  # Allows frontend access to API
@@ -56,11 +58,34 @@ def send_email(to_emails, subject, body, filename):
 #     "database": "Local_Pump_Info"
 # }
 
+# db_config = {
+#     "host": "132.148.249.113",
+#     "user": "quote",
+#     "password": ".2zKuI]4#n@V",
+#     "database": "Quotes_Database_3_13_25"
+# }
+
+# Configure Fixie Socks proxy
+fixie_socks_url = os.getenv("FIXIE_SOCKS_HOST")
+if fixie_socks_url:
+    # Extract username, password, host, and port from the URL
+    proxy_parts = fixie_socks_url.split("@")
+    if len(proxy_parts) == 2:
+        auth, host_port = proxy_parts
+        username, password = auth.split(":")
+        host, port = host_port.split(":")
+        port = int(port)
+
+        # Set up the proxy
+        socks.set_default_proxy(socks.SOCKS5, host, port, username=username, password=password)
+        socket.socket = socks.socksocket
+
+# Database configuration
 db_config = {
-    "host": "132.148.249.113",
-    "user": "quote",
-    "password": ".2zKuI]4#n@V",
-    "database": "Quotes_Database_3_13_25"
+    "host": os.getenv("DB_HOST", "132.148.249.113"),
+    "user": os.getenv("DB_USER", "quote"),
+    "password": os.getenv("DB_PASSWORD", ".2zKuI]4#n@V"),
+    "database": os.getenv("DB_NAME", "Quotes_Database_3_13_25")
 }
 
 def get_flange_size_id(psi):
