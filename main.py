@@ -6,6 +6,7 @@ from fpdf import FPDF
 import os
 import socks
 import socket
+import requests
 
 app = Flask(__name__)
 CORS(app)  # Allows frontend access to API
@@ -66,19 +67,15 @@ def send_email(to_emails, subject, body, filename):
 # }
 
 # Configure Fixie Socks proxy
-fixie_socks_url = os.getenv("FIXIE_SOCKS_HOST")
-if fixie_socks_url:
-    # Extract username, password, host, and port from the URL
-    proxy_parts = fixie_socks_url.split("@")
-    if len(proxy_parts) == 2:
-        auth, host_port = proxy_parts
-        username, password = auth.split(":")
-        host, port = host_port.split(":")
-        port = int(port)
+socks.set_default_proxy(socks.SOCKS5, "speedway.usefixie.com", 1080, username="fixie", password="M6lwVjq3RlMwT1c")
+socket.socket = socks.socksocket
 
-        # Set up the proxy
-        socks.set_default_proxy(socks.SOCKS5, host, port, username=username, password=password)
-        socket.socket = socks.socksocket
+# Test the connection
+try:
+    response = requests.get("https://ifconfig.me")
+    print("Your IP address is:", response.text)
+except Exception as e:
+    print("Connection failed:", str(e))
 
 # Database configuration
 db_config = {
