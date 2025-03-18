@@ -67,8 +67,19 @@ def send_email(to_emails, subject, body, filename):
 # }
 
 # Configure Fixie Socks proxy
-socks.set_default_proxy(socks.SOCKS5, "speedway.usefixie.com", 1080, username="fixie", password="M6lwVjq3RlMwT1c")
-socket.socket = socks.socksocket
+# socks.set_default_proxy(socks.SOCKS5, "speedway.usefixie.com", 1080, username="fixie", password="M6lwVjq3RlMwT1c")
+# socket.socket = socks.socksocket
+
+proxies = {
+    "http": "socks5://fixie:M6lwVjq3RlMwT1c@speedway.usefixie.com:1080",
+    "https": "socks5://fixie:M6lwVjq3RlMwT1c@speedway.usefixie.com:1080"
+}
+
+try:
+    response = requests.get("https://ifconfig.me", proxies=proxies)
+    print("Your IP address through Fixie:", response.text)
+except Exception as e:
+    print("Fixie Proxy Connection failed:", str(e))
 
 # Test the connection
 try:
