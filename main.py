@@ -903,7 +903,7 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
         # Build the flange-specific sentence
         if ball_type.lower() == "tungsten":
             dynamic_description += (
-                f"Aquflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
                 f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
                 f"with {ball_type} Carbid balls and {diaphragm} Diaphragm with {pump_data.get('suction_flange_size', 'N/A')} "
                 f"ANSI RF Type #{flange_size_id} Suction and {pump_data.get('discharge_flange_size', 'N/A')} "
@@ -913,7 +913,7 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
             )
         elif ball_type.lower() == "ceramic":
             dynamic_description += (
-                f"Aquflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
                 f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
                 f"with {ball_type} balls and {diaphragm} Diaphragm with {pump_data.get('suction_flange_size', 'N/A')} "
                 f"ANSI RF Type #{flange_size_id} Suction and {pump_data.get('discharge_flange_size', 'N/A')} "
@@ -923,7 +923,7 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
             )
         else:
             dynamic_description += (
-                f"Aquflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
                 f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
                 f"and {diaphragm} Diaphragm with {pump_data.get('suction_flange_size', 'N/A')} "
                 f"ANSI RF Type #{flange_size_id} Suction and {pump_data.get('discharge_flange_size', 'N/A')} "
@@ -935,7 +935,7 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
         # Use the default sentence for non-flange connections
         if ball_type.lower() == "tungsten":
             dynamic_description += (
-                f"Aquflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
                 f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
                 f"with {ball_type} Carbid balls and {diaphragm} Diaphragm with {pump_data.get('Liq_Inlet', 'N/A')} suction "
                 f"and {pump_data.get('Liq_Outlet', 'N/A')} discharge check valve connections. "
@@ -944,7 +944,7 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
             )
         elif ball_type.lower() == "ceramic":
             dynamic_description += (
-                f"Aquflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
                 f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
                 f"with {ball_type} balls and {diaphragm} Diaphragm with {pump_data.get('Liq_Inlet', 'N/A')} suction "
                 f"and {pump_data.get('Liq_Outlet', 'N/A')} discharge check valve connections. "
@@ -953,7 +953,7 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
             )
         else:
             dynamic_description += (
-                f"Aquflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
                 f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
                 f"and {diaphragm} Diaphragm with {pump_data.get('Liq_Inlet', 'N/A')} suction "
                 f"and {pump_data.get('Liq_Outlet', 'N/A')} discharge check valve connections. The pump has a maximum "
