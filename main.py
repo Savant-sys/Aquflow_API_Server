@@ -2,11 +2,15 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 from flask_cors import CORS
 import math
-from fpdf import FPDF
-import os
 import socks
 import socket
 import requests
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+from datetime import datetime
+import os
 
 app = Flask(__name__)
 CORS(app)  # Allows frontend access to API
@@ -872,101 +876,145 @@ def find_best_pump(gph=None, lph=None, psi=None, bar=None, hz=None,
         return {"error": "No suitable pump found for the given specifications."}
 
 def generate_pdf(pump_data, filename="pump_quote.pdf"):
-    # Create a PDF object
-    pdf = FPDF()
-    pdf.add_page()
+    """Generates a PDF quote for the pump and saves it as a file."""
+    doc = SimpleDocTemplate(filename, pagesize=letter)
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        name="CenteredTitle",
+        parent=styles["Heading2"],
+        fontSize=16,  # Increased font size
+        alignment=1,  # Center alignment
+        spaceAfter=6,  # Reduced space below the title
+    )
+    heading_style = styles["Heading2"]
+    normal_style = styles["BodyText"]
+    footer_style = ParagraphStyle(
+        name="FooterStyle",
+        parent=normal_style,
+        fontSize=9,
+        textColor=colors.grey,
+        leading=12,
+        spaceBefore=10,
+    )
 
-    # Set font for the entire document
-    pdf.set_font("Arial", size=12)
+    # ✅ Generate Auto Date & Quote Number
+    today = datetime.today()
+    quote_number = f"AQQ{today.strftime('%y%m%d')}__"  # Format: AQQYYMMDD__
+    formatted_date = today.strftime('%d-%b-%y')  # Format: DD-MMM-YY
 
-    # Add a header with a logo
-    pdf.image("logo.png", x=10, y=8, w=30)  # Ensure the logo path is correct
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, txt="Pump Quote", ln=True, align="C")
-    pdf.ln(10)  # Add some space
+    # ✅ Create Smaller 2x2 Table (Quote # | Date) with Reduced Column Widths
+    quote_date_table = Table([
+        ["Quote #", "Date"],           # Header row
+        [quote_number, formatted_date]  # Data row
+    ], colWidths=[110, 110])  # Smaller width for compact size
 
-    # Initialize the dynamic description string
-    dynamic_description = ""
+    # ✅ Style the Quote Table
+    quote_date_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),    # Grey background for headers
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),  # White text for headers
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),  # Center-align text
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),  # Bold header text
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),  # Smaller padding for compact look
+        ("GRID", (0, 0), (-1, -1), 1, colors.black)  # Black grid lines
+    ]))
 
-    # Add the base description
+    # ✅ Logo (Left), Address (Middle), Quote Table (Right)
+    logo_path = "logo.png"
+    address = """<b><font size="9">Acuflow-Div. of Precision</font></b><br/>
+    <b><font size="9">Flow Technologies Inc.</font></b><br/>
+    <font size="8">1642 McGaw Ave.<br/>
+    Irvine, CA 92614<br/>
+    Ph: (949) 757-1753</font>"""
+
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=100, height=50) 
+
+        # Add "Quote Form 2311" at the top right corner
+        quote_form_text = Paragraph("<font size='7'>Quote Form 2311</font>", normal_style)
+
+        # Create a 2x1 table for Customer information
+        customer_name = pump_data.get("customer_name", "John Smith")  # Default to "John Smith" if not provided
+        customer_table = Table([
+            ["Customer"],  # First row
+            [customer_name]  # Second row
+        ], colWidths=[215], rowHeights=[20, 20])  # Smaller row heights
+
+        # Style the Customer table
+        customer_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),  # Grey background for the header
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),  # White text for the header
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),  # Center-align text in all cells
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),  # Vertically center-align text
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),  # Bold header text
+            ("FONTSIZE", (0, 0), (-1, -1), 10),  # Slightly larger font size
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 2),  # Padding for the header
+            ("TOPPADDING", (0, 1), (-1, 1), 5),  # Add padding to move the second row down
+            ("GRID", (0, 0), (-1, -1), 1, colors.black)  # Black grid lines
+        ]))
+
+        # Create a header table with 3 columns
+        header_table = Table([
+            [[logo, Spacer(1, 10), Spacer(1, 10), customer_table],  # Logo + Spacer + Customer Table
+             Paragraph(address, normal_style),  # Address
+             [quote_form_text, quote_date_table]  # Quote Form Text + Quote Table
+            ]
+        ], colWidths=[115, 250, 120])  # Adjust widths for correct alignment
+
+        # ✅ Align Everything in the Header
+        header_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),  # Align everything to the top
+            ("LEFTPADDING", (1, 0), (1, 0), 5),   # Reduce space between logo & address
+            ("ALIGN", (0, 0), (0, 0), "LEFT"),    # Left-align logo and customer table
+            ("ALIGN", (1, 0), (1, 0), "LEFT"),    # Left-align address
+            ("ALIGN", (2, 0), (2, 0), "RIGHT")    # Right-align Quote Form Text & Quote Table
+        ]))
+
+        elements.append(header_table)
+        elements.append(Spacer(1, 20))  # Reduce space below
+
+    # ✅ Pump Model Name (Centered and Larger Title)
+    pump_model = pump_data.get("model", "N/A")
+    elements.append(Paragraph(f"<b>Pump Model:</b> {pump_model}", title_style))
+
+    # ✅ Description Section
+    elements.append(Paragraph("<b>Description:</b>", heading_style))
+
+    # ✅ Dynamic Description (Combined into One Paragraph)
+    dynamic_description = []
     ball_type = pump_data.get("balls_type", "N/A")
     diaphragm = pump_data.get("diaphragm", "N/A")
-
-    # Check if suction lift is "yes" and add "High Suction Lift" to the description
     suction_lift_text = "High Suction Lift " if pump_data.get("suction_lift", "").lower() == "yes" else ""
 
     if pump_data.get("flange", "").lower() == "yes":
-        # Get the flange size ID based on PSI
         psi = pump_data.get("psi", 0)
-        flange_size_id = get_flange_size_id(psi)  # Use the function from the top of the code
+        flange_size_id = get_flange_size_id(psi)  # Assume this function is defined elsewhere
 
-        # Build the flange-specific sentence
-        if ball_type.lower() == "tungsten":
-            dynamic_description += (
-                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
-                f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
-                f"with {ball_type} Carbid balls and {diaphragm} Diaphragm with {pump_data.get('suction_flange_size', 'N/A')} "
-                f"ANSI RF Type #{flange_size_id} Suction and {pump_data.get('discharge_flange_size', 'N/A')} "
-                f"ANSI RF Type #{flange_size_id} Discharge Flanges."
-                f"The pump has a maximum flow capacity of {pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz "
-                f"and design pressure of {pump_data.get('psi', 'N/A')} PSI."
-            )
-        elif ball_type.lower() == "ceramic":
-            dynamic_description += (
-                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
-                f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
-                f"with {ball_type} balls and {diaphragm} Diaphragm with {pump_data.get('suction_flange_size', 'N/A')} "
-                f"ANSI RF Type #{flange_size_id} Suction and {pump_data.get('discharge_flange_size', 'N/A')} "
-                f"ANSI RF Type #{flange_size_id} Discharge Flanges."
-                f"The pump has a maximum flow capacity of {pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz "
-                f"and design pressure of {pump_data.get('psi', 'N/A')} PSI."
-            )
-        else:
-            dynamic_description += (
-                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
-                f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
-                f"and {diaphragm} Diaphragm with {pump_data.get('suction_flange_size', 'N/A')} "
-                f"ANSI RF Type #{flange_size_id} Suction and {pump_data.get('discharge_flange_size', 'N/A')} "
-                f"ANSI RF Type #{flange_size_id} Discharge. The pump has a maximum flow capacity of "
-                f"{pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz and design pressure of "
-                f"{pump_data.get('psi', 'N/A')} PSI."
-            )
+        description = (
+            f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+            f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')}. "
+            f"It features {ball_type} balls and a {diaphragm} diaphragm. "
+            f"The pump includes {pump_data.get('suction_flange_size', 'N/A')} ANSI RF Type #{flange_size_id} suction "
+            f"and {pump_data.get('discharge_flange_size', 'N/A')} ANSI RF Type #{flange_size_id} discharge flanges. "
+            f"The pump has a maximum flow capacity of {pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz "
+            f"and a design pressure of {pump_data.get('psi', 'N/A')} PSI."
+        )
     else:
-        # Use the default sentence for non-flange connections
-        if ball_type.lower() == "tungsten":
-            dynamic_description += (
-                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
-                f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
-                f"with {ball_type} Carbid balls and {diaphragm} Diaphragm with {pump_data.get('Liq_Inlet', 'N/A')} suction "
-                f"and {pump_data.get('Liq_Outlet', 'N/A')} discharge check valve connections. "
-                f"The pump has a maximum flow capacity of {pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz "
-                f"and design pressure of {pump_data.get('psi', 'N/A')} PSI."
-            )
-        elif ball_type.lower() == "ceramic":
-            dynamic_description += (
-                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
-                f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
-                f"with {ball_type} balls and {diaphragm} Diaphragm with {pump_data.get('Liq_Inlet', 'N/A')} suction "
-                f"and {pump_data.get('Liq_Outlet', 'N/A')} discharge check valve connections. "
-                f"The pump has a maximum flow capacity of {pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz "
-                f"and design pressure of {pump_data.get('psi', 'N/A')} PSI."
-            )
-        else:
-            dynamic_description += (
-                f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
-                f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')} "
-                f"and {diaphragm} Diaphragm with {pump_data.get('Liq_Inlet', 'N/A')} suction "
-                f"and {pump_data.get('Liq_Outlet', 'N/A')} discharge check valve connections. The pump has a maximum "
-                f"flow capacity of {pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz and design "
-                f"pressure of {pump_data.get('psi', 'N/A')} PSI."
-            )
+        description = (
+            f"Acuflow {pump_data.get('series', 'N/A')} ({pump_data.get('simplex_duplex', 'N/A')}) "
+            f"hydraulic diaphragm metering pump with {suction_lift_text}liquid end in {pump_data.get('liquid_end_material', 'N/A')}. "
+            f"It features {ball_type} balls and a {diaphragm} diaphragm. "
+            f"The pump includes {pump_data.get('Liq_Inlet', 'N/A')} suction and {pump_data.get('Liq_Outlet', 'N/A')} discharge check valve connections. "
+            f"The pump has a maximum flow capacity of {pump_data.get('gph', 'N/A')} GPH at {pump_data.get('hz', 'N/A')} Hz "
+            f"and a design pressure of {pump_data.get('psi', 'N/A')} PSI."
+        )
 
     # Add motor description if want_motor is "yes"
     if pump_data.get("want_motor", "").lower() == "yes":
-        # Determine motor input voltage based on motor_power, hz, and phase
         motor_power = pump_data.get("motor_power", "").upper()
-        hz = pump_data.get("hz", 60)  # Default to 60 Hz if not provided
-        phase = pump_data.get("phase", "1 Ph")  # Default to 1 Ph if not provided
+        hz = pump_data.get("hz", 60)
+        phase = pump_data.get("phase", "1 Ph")
 
         if motor_power == "AC":
             if hz == 60:
@@ -983,212 +1031,100 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
             input_voltage = "90 VDC"
             phase = ""  # Remove phase for DC motors
 
-        # Get motor_hp from pump_data
-        motor_hp = pump_data.get("Motor_HP_AC", "N/A")  # Default to N/A if not provided
+        motor_hp = pump_data.get("Motor_HP_AC", "N/A")
 
-        # Add the motor description sentence
-        if motor_power == "DC":
-            dynamic_description += f" The pump comes with {motor_hp} HP, {input_voltage}, {pump_data.get('motor_type', 'N/A')} Motor."
-        else:
-            dynamic_description += f" The pump comes with {motor_hp} HP, {input_voltage}, {phase}, {pump_data.get('motor_type', 'N/A')} Motor."
+        description += (
+            f" The pump comes with a {motor_hp} HP, {input_voltage}, {phase} {pump_data.get('motor_type', 'N/A')} motor."
+        )
 
-    # Add degassing description if degassing is "yes"
+    # Add additional features (only if marked as "yes")
+    additional_features = []
     if pump_data.get("degassing", "").lower() == "yes":
-        dynamic_description += " The pump comes with a degassing valve."
-
-    # Add food graded oil description if food_graded_oil is "yes"
+        additional_features.append("degassing valve")
     if pump_data.get("food_graded_oil", "").lower() == "yes":
-        dynamic_description += " The pump comes with food graded oil."
-
-    # Add suction lift description if suction_lift is "yes"
+        additional_features.append("food-graded oil")
     if pump_data.get("suction_lift", "").lower() == "yes":
-        dynamic_description += " The pump comes with suction lift."
+        additional_features.append("suction lift")
+
+    if additional_features:
+        description += " The pump also includes the following features: " + ", ".join(additional_features) + "."
 
     # Add the combined description to the PDF
-    pdf.multi_cell(0, 10, txt=dynamic_description)
+    elements.append(Paragraph(description, normal_style))
+    elements.append(Spacer(1, 12))  # Minimal space after description
 
-    # Add pump details section (unchanged)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, txt="Pump Specifications", ln=True)
-    pdf.set_font("Arial", size=12)
+    # ✅ Key Specifications Table (Only include "yes" or valid data)
+    elements.append(Paragraph("<b>Key Specifications:</b>", heading_style))
+    elements.append(Spacer(1, 6))  # Minimal space after heading
 
-    # Add Model
-    pdf.cell(0, 10, txt=f"Model: {pump_data.get('model', 'N/A')}", ln=True)
+    pump_specs = [
+        ["Specification", "Value"],
+        ["Series", pump_data.get("series", "N/A")],
+        ["Flow Rate (GPH)", pump_data.get("gph", "N/A")],
+        ["Pressure (PSI)", pump_data.get("psi", "N/A")],
+        ["Frequency (Hz)", pump_data.get("hz", "N/A")],
+        ["Diaphragm Material", pump_data.get("diaphragm", "N/A")],
+        ["Liquid End Material", pump_data.get("liquid_end_material", "N/A")],
+        ["Balls Type", pump_data.get("balls_type", "N/A")],
+    ]
 
-    # Add Series
-    pdf.cell(0, 10, txt=f"Series: {pump_data.get('series', 'N/A')}", ln=True)
-
-    # Add GPH/LPH
-    if "gph" in pump_data:
-        pdf.cell(0, 10, txt=f"Flow Rate (GPH): {pump_data['gph']}", ln=True)
-    elif "lph" in pump_data:
-        pdf.cell(0, 10, txt=f"Flow Rate (LPH): {pump_data['lph']}", ln=True)
-
-    # Add PSI/Bar
-    if "psi" in pump_data:
-        pdf.cell(0, 10, txt=f"Pressure (PSI): {pump_data['psi']}", ln=True)
-    elif "bar" in pump_data:
-        pdf.cell(0, 10, txt=f"Pressure (Bar): {pump_data['bar']}", ln=True)
-
-    # Add Hz
-    pdf.cell(0, 10, txt=f"Frequency (Hz): {pump_data.get('hz', 'N/A')}", ln=True)
-
-    # Add Simplex/Duplex
-    pdf.cell(0, 10, txt=f"Simplex/Duplex: {pump_data.get('simplex_duplex', 'N/A')}", ln=True)
-
-    # Add Motor Type and Motor Power (if applicable)
-    if pump_data.get("want_motor", "").lower() == "yes":
-        pdf.cell(0, 10, txt=f"Motor Type: {pump_data.get('motor_type', 'N/A')}", ln=True)
-        pdf.cell(0, 10, txt=f"Motor Power: {pump_data.get('motor_power', 'N/A')}", ln=True)
-
-        # Add Motor Horsepower (HP)
-        motor_hp = "N/A"  # Default value
-        if pump_data.get("motor_power", "") == "AC":
-            if pump_data.get("use_hp", False):  # Check if high pressure is needed
-                motor_hp = pump_data.get("Motor_HP_AC_High_Pressure", "N/A")
-            else:
-                motor_hp = pump_data.get("Motor_HP_AC", "N/A")
-        elif pump_data.get("motor_power", "") == "DC":
-            if pump_data.get("motor_type", "") == "TEFC":
-                motor_hp = pump_data.get("Motor_HP_DC_TEFC", "N/A")
-            elif pump_data.get("motor_type", "") == "XPFC":
-                motor_hp = pump_data.get("Motor_HP_DC_XPFC", "N/A")
-
-        pdf.cell(0, 10, txt=f"Motor Horsepower (HP): {motor_hp}", ln=True)
-
-    # Add Diaphragm
-    pdf.cell(0, 10, txt=f"Diaphragm Material: {pump_data.get('diaphragm', 'N/A')}", ln=True)
-
-    # Add Liquid End Material
-    pdf.cell(0, 10, txt=f"Liquid End Material: {pump_data.get('liquid_end_material', 'N/A')}", ln=True)
-
-    # Add Leak Detection (if not "no")
-    if pump_data.get("leak_detection", "").lower() != "no":
-        pdf.cell(0, 10, txt=f"Leak Detection: {pump_data.get('leak_detection', 'N/A')}", ln=True)
-
-    # Add Phase
-    pdf.cell(0, 10, txt=f"Phase: {pump_data.get('phase', 'N/A')}", ln=True)
-
-    # Add Degassing (if "yes")
-    if pump_data.get("degassing", "").lower() == "yes":
-        pdf.cell(0, 10, txt=f"Add Degassing: Yes", ln=True)
-    else:
-        pdf.cell(0, 10, txt=f"Add Degassing: No", ln=True)
-
-    # Add Flange (if "yes")
+    # Add flange and suction lift only if marked as "yes"
     if pump_data.get("flange", "").lower() == "yes":
-        pdf.cell(0, 10, txt=f"Add Flange: Yes", ln=True)
-    else:
-        pdf.cell(0, 10, txt=f"Add Flange: No", ln=True)
-
-    # Add Balls Type
-    pdf.cell(0, 10, txt=f"Balls Type: {pump_data.get('balls_type', 'N/A')}", ln=True)
-
-    # Add Ball Size
-    pdf.cell(0, 10, txt=f"Ball Size: {pump_data.get('ball_size_display', 'N/A')}", ln=True)
-
-    # Add Suction Lift (if "yes")
+        pump_specs.append(["Flange", "Yes"])
     if pump_data.get("suction_lift", "").lower() == "yes":
-        pdf.cell(0, 10, txt=f"Add Suction Lift: Yes", ln=True)
-        if pump_data.get("suction_lift_message"):  # Display message if suction lift is not available
-            pdf.cell(0, 10, txt=f"Note: {pump_data['suction_lift_message']}", ln=True)
-    else:
-        pdf.cell(0, 10, txt=f"Add Suction Lift: No", ln=True)
+        pump_specs.append(["Suction Lift", "Yes"])
 
-    # Add Food Graded Oil (if "yes")
-    if pump_data.get("food_graded_oil", "").lower() == "yes":
-        pdf.cell(0, 10, txt=f"Add Food Graded Oil: Yes", ln=True)
-    else:
-        pdf.cell(0, 10, txt=f"Add Food Graded Oil: No", ln=True)
+    # Remove empty rows
+    pump_specs = [row for row in pump_specs if row]
 
-    pdf.ln(10)  # Add some space
+    table = Table(pump_specs, colWidths=[200, 200])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+        ("GRID", (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 20))
 
-    # Add pricing details (unchanged)
-    pdf.set_font("Arial", "B", 12)
-    pdf.cell(0, 10, txt="Pricing Details", ln=True)
-    pdf.set_font("Arial", size=12)
+    # ✅ Total Price
+    total_price = pump_data.get("total_price", "N/A")
+    if total_price != "N/A":  # Only add total price if it's not "N/A"
+        total_price_table = Table([
+            ["Total Price", f"${total_price}" if isinstance(total_price, (int, float)) else total_price]
+        ], colWidths=[200, 200])
+        total_price_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+            ("GRID", (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        elements.append(total_price_table)
+        elements.append(Spacer(1, 5))
 
-    # Add Pump Price
-    pdf.cell(100, 10, txt="Pump Price", border=1)
-    pdf.cell(80, 10, txt=f"${pump_data['pump_price']}", border=1, ln=True)
+    # ✅ Footer Notes
+    elements.append(Paragraph("<b>Notes:</b>", footer_style))  # Add "Notes:" section
 
-    # Add Motor Price
-    pdf.cell(100, 10, txt="Motor Price", border=1)
-    if isinstance(pump_data.get("motor_price"), str):  # Handle "C/F" case
-        pdf.cell(80, 10, txt=f"{pump_data['motor_price']}", border=1, ln=True)
-    else:
-        pdf.cell(80, 10, txt=f"${pump_data.get('motor_price', 0)}", border=1, ln=True)
+    # Combine all notes into a single Paragraph with <br/> for line breaks
+    footer_notes = [
+        "1. Your above pricing are Net prices based on Ex work Irvine, CA. Prices valid 30 days from quote date.",
+        "2. If you decided to add ECCA or Leak detection system, the pump model number will change.",
+        f"3. Estimated lead time is {get_lead_time(pump_data.get('series', 'N/A'))} ARO, based on current inventory and scheduling.",
+        "4. There will be price adder for Material Certificates, certificate of origin and Performance test.",
+        "5. Anything not clearly stated in the quote above is deemed as not included in pricing, regardless of RFQ or Specs."
+    ]
 
-    # Add Flange Price (if applicable)
-    if pump_data.get("flange_price", 0) != 0:
-        pdf.cell(100, 10, txt="Flange Price", border=1)
-        if isinstance(pump_data.get("flange_price"), str):  # Handle "C/F" or "Unavailable" cases
-            pdf.cell(80, 10, txt=f"{pump_data['flange_price']}", border=1, ln=True)
-        else:
-            pdf.cell(80, 10, txt=f"${pump_data.get('flange_price', 0)}", border=1, ln=True)
+    # Combine notes into a single string with <br/> tags
+    footer_text = "<br/>".join(footer_notes)
+    elements.append(Paragraph(footer_text, footer_style))  # Add all notes in one Paragraph
 
-    # Add Flange Adaptor Price (if applicable)
-    if pump_data.get("flange_adaptor_price", 0) != 0:
-        pdf.cell(100, 10, txt="Flange Adaptor Price", border=1)
-        if isinstance(pump_data.get("flange_adaptor_price"), str):  # Handle "C/F" or "Unavailable" cases
-            pdf.cell(80, 10, txt=f"{pump_data['flange_adaptor_price']}", border=1, ln=True)
-        else:
-            pdf.cell(80, 10, txt=f"${pump_data.get('flange_adaptor_price', 0)}", border=1, ln=True)
-
-    # Add Diaphragm Price
-    if pump_data['diaphragm_price'] != 0:
-        pdf.cell(100, 10, txt="Diaphragm Price", border=1)
-        pdf.cell(80, 10, txt=f"${pump_data['diaphragm_price']}", border=1, ln=True)
-
-    # Add Leak Detection Price
-    if pump_data['leak_detection_price'] != 0:
-        pdf.cell(100, 10, txt="Leak Detection Price", border=1)
-        pdf.cell(80, 10, txt=f"${pump_data['leak_detection_price']}", border=1, ln=True)
-
-    # Add Degassing Price
-    if pump_data.get("degassing", "").lower() == "yes":
-        pdf.cell(100, 10, txt="Degassing Price", border=1)
-        pdf.cell(80, 10, txt="$450", border=1, ln=True)
-
-    # Add Suction Lift Price (if available)
-    if pump_data.get("suction_lift_price", 0) != 0:
-        pdf.cell(100, 10, txt="Suction Lift Price", border=1)
-        if isinstance(pump_data.get("suction_lift_price"), str):  # Handle "C/F" case
-            pdf.cell(80, 10, txt=f"{pump_data['suction_lift_price']}", border=1, ln=True)
-        else:
-            pdf.cell(80, 10, txt=f"${pump_data.get('suction_lift_price', 0)}", border=1, ln=True)
-
-    # Add Ball Size Price (if applicable)
-    if pump_data.get("ball_size_price", 0) != 0:
-        pdf.cell(100, 10, txt="Ball Size Price", border=1)
-        pdf.cell(80, 10, txt=f"${pump_data.get('ball_size_price', 0)}", border=1, ln=True)
-
-    # Add Food Graded Oil Price (if applicable)
-    if pump_data.get("food_graded_oil", "").lower() == "yes":
-        pdf.cell(100, 10, txt="Food Graded Oil Price", border=1)
-        pdf.cell(80, 10, txt=f"${pump_data.get('food_graded_oil_price', 0)}", border=1, ln=True)
-
-    # Add Pump + Motor Price
-    pump_motor_price = pump_data['pump_price'] + pump_data['motor_price']
-    pdf.cell(100, 10, txt="Pump + Motor Price", border=1)
-    pdf.cell(80, 10, txt=f"{pump_motor_price}", border=1, ln=True)
-
-    # Add Total Price
-    pdf.cell(100, 10, txt="Total Price", border=1)
-    if isinstance(pump_data.get("total_price"), str):  # Handle "C/F" case
-        pdf.cell(80, 10, txt=f"{pump_data['total_price']}", border=1, ln=True)
-    else:
-        pdf.cell(80, 10, txt=f"${pump_data.get('total_price', 0)}", border=1, ln=True)
-
-    pdf.ln(10)  # Add some space
-
-    # Add a footer
-    pdf.set_font("Arial", "I", 10)
-    pdf.cell(0, 10, txt="Thank you for choosing us!", ln=True, align="C")
-    pdf.cell(0, 10, txt="Terms and conditions apply.", ln=True, align="C")
-
-    # Save the PDF
-    pdf.output(filename)
+    # Generate PDF
+    doc.build(elements)
+    print(f"✅ PDF saved as {filename}")
     return filename
 
 @app.route('/get_pump', methods=['GET'])
