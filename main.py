@@ -1127,6 +1127,21 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
     print(f"✅ PDF saved as {filename}")
     return filename
 
+def get_lead_time(series):
+    """Returns lead time based on the series."""
+    if series == "Series 1000":
+        return "2-3 weeks"
+    elif series == "Series 2000":
+        return "3-4 weeks"
+    elif series == "Series 3000":
+        return "4-6 weeks"
+    elif series == "Series 4000":
+        return "7-12 weeks"
+    elif series == "Series 900":
+        return "4-6 weeks"
+    else:
+        return "N/A"
+
 @app.route('/get_pump', methods=['GET'])
 def get_pump():
     try:
