@@ -7,6 +7,9 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from datetime import datetime
+import socks
+import socket
+import requests
 import os
 
 app = Flask(__name__)
@@ -51,20 +54,30 @@ def send_email(to_emails, subject, body, filename):
     except Exception as e:
         print(f"Error sending email: {e}")
         return False
+proxies = {
+    "http": "socks5://fixie:M6lwVjq3RlMwT1c@speedway.usefixie.com:1080",
+    "https": "socks5://fixie:M6lwVjq3RlMwT1c@speedway.usefixie.com:1080"
+}
 
-# MySQL Database Configuration
-# db_config = {
-#     "host": "localhost",
-#     "user": "root",
-#     "password": "1234",
-#     "database": "Local_Pump_Info"
-# }
+try:
+    response = requests.get("https://ifconfig.me", proxies=proxies)
+    print("Your IP address through Fixie:", response.text)
+except Exception as e:
+    print("Fixie Proxy Connection failed:", str(e))
 
+# Test the connection
+try:
+    response = requests.get("https://ifconfig.me")
+    print("Your IP address is:", response.text)
+except Exception as e:
+    print("Connection failed:", str(e))
+
+# Database configuration
 db_config = {
-    "host": "132.148.249.113",
-    "user": "quote",
-    "password": ".2zKuI]4#n@V",
-    "database": "Quotes_Database_3_13_25"
+    "host": os.getenv("DB_HOST", "132.148.249.113"),
+    "user": os.getenv("DB_USER", "quote"),
+    "password": os.getenv("DB_PASSWORD", ".2zKuI]4#n@V"),
+    "database": os.getenv("DB_NAME", "Quotes_Database_3_13_25")
 }
 
 def get_flange_size_id(psi):
@@ -1227,4 +1240,5 @@ def test_db():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))  # Use Heroku's $PORT or default to 5000
+    app.run(host="0.0.0.0", port=port, debug=False)  # Disable debug mode for production
