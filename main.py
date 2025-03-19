@@ -2,9 +2,6 @@ from flask import Flask, request, jsonify, send_file
 import mysql.connector
 from flask_cors import CORS
 import math
-import socks
-import socket
-import requests
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -63,41 +60,11 @@ def send_email(to_emails, subject, body, filename):
 #     "database": "Local_Pump_Info"
 # }
 
-# db_config = {
-#     "host": "132.148.249.113",
-#     "user": "quote",
-#     "password": ".2zKuI]4#n@V",
-#     "database": "Quotes_Database_3_13_25"
-# }
-
-# Configure Fixie Socks proxy
-# socks.set_default_proxy(socks.SOCKS5, "speedway.usefixie.com", 1080, username="fixie", password="M6lwVjq3RlMwT1c")
-# socket.socket = socks.socksocket
-
-proxies = {
-    "http": "socks5://fixie:M6lwVjq3RlMwT1c@speedway.usefixie.com:1080",
-    "https": "socks5://fixie:M6lwVjq3RlMwT1c@speedway.usefixie.com:1080"
-}
-
-try:
-    response = requests.get("https://ifconfig.me", proxies=proxies)
-    print("Your IP address through Fixie:", response.text)
-except Exception as e:
-    print("Fixie Proxy Connection failed:", str(e))
-
-# Test the connection
-try:
-    response = requests.get("https://ifconfig.me")
-    print("Your IP address is:", response.text)
-except Exception as e:
-    print("Connection failed:", str(e))
-
-# Database configuration
 db_config = {
-    "host": os.getenv("DB_HOST", "132.148.249.113"),
-    "user": os.getenv("DB_USER", "quote"),
-    "password": os.getenv("DB_PASSWORD", ".2zKuI]4#n@V"),
-    "database": os.getenv("DB_NAME", "Quotes_Database_3_13_25")
+    "host": "132.148.249.113",
+    "user": "quote",
+    "password": ".2zKuI]4#n@V",
+    "database": "Quotes_Database_3_13_25"
 }
 
 def get_flange_size_id(psi):
@@ -358,7 +325,7 @@ def calculate_suction_lift_price(series, liquid_end_material, suction_lift):
             return "C/F"
     return 0
 
-def find_best_pump(gph=None, lph=None, psi=None, bar=None, hz=None, 
+def find_best_pump(customer_name=None, gph=None, lph=None, psi=None, bar=None, hz=None, 
                    simplex_duplex=None, want_motor=None, motor_type=None, 
                    motor_power=None, spm=None, diaphragm=None, liquid_end_material=None, 
                    leak_detection=None, phase=None, degassing=None, flange=None, 
@@ -754,6 +721,7 @@ def find_best_pump(gph=None, lph=None, psi=None, bar=None, hz=None,
             "Motor_HP_DC_TEFC": pump.get("Motor_HP_DC_TEFC", "N/A"),
             "Motor_HP_DC_XPFC": pump.get("Motor_HP_DC_XPFC", "N/A"),
             "food_graded_oil_price": food_graded_oil_price,
+            "customer_name": customer_name,
         })
 
     # Inside the `find_best_pump` function, after selecting the best pump
@@ -935,7 +903,7 @@ def generate_pdf(pump_data, filename="pump_quote.pdf"):
         quote_form_text = Paragraph("<font size='7'>Quote Form 2311</font>", normal_style)
 
         # Create a 2x1 table for Customer information
-        customer_name = pump_data.get("customer_name", "John Smith")  # Default to "John Smith" if not provided
+        customer_name = pump_data.get("customer_name", "N/A")
         customer_table = Table([
             ["Customer"],  # First row
             [customer_name]  # Second row
@@ -1149,6 +1117,7 @@ def get_pump():
         print("Request Args:", request.args)
 
         # Get parameters from the request
+        customer_name = request.args.get('customer_name', type=str)
         gph = request.args.get('gph', type=float)
         psi = request.args.get('psi', type=float)
         hz = request.args.get('hz', type=int)
@@ -1173,6 +1142,7 @@ def get_pump():
 
         # Log the parsed parameters
         print("Parsed Parameters:", {
+            "customer_name" : customer_name,
             "gph": gph,
             "psi": psi,
             "hz": hz,
@@ -1198,7 +1168,7 @@ def get_pump():
 
         # Find the best pump
         result = find_best_pump(
-            gph, None, psi, None, hz, simplex_duplex, want_motor, motor_type, 
+            customer_name, gph, None, psi, None, hz, simplex_duplex, want_motor, motor_type, 
             motor_power, spm, diaphragm, liquid_end_material, leak_detection, 
             phase, degassing, flange, balls_type, suction_lift, ball_size, 
             suction_flange_size, discharge_flange_size, food_graded_oil
@@ -1257,5 +1227,4 @@ def test_db():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # Use Heroku's $PORT or default to 5000
-    app.run(host="0.0.0.0", port=port, debug=False)  # Disable debug mode for production
+    app.run(host="0.0.0.0", port=5000, debug=True)
