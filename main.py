@@ -22,10 +22,10 @@ from email.mime.text import MIMEText
 from email import encoders
 
 # Email configuration
-SMTP_SERVER = 'smtp.gmail.com'
-SMTP_PORT = 587
-EMAIL_ADDRESS = 'michaelkhuri@gmail.com'
-EMAIL_PASSWORD = 'nkfv bdut pjud kenv'
+SMTP_SERVER = 'smtp.bizmail.yahoo.com'
+SMTP_PORT = 465
+EMAIL_ADDRESS = 'quotes@acuflow.com'
+EMAIL_PASSWORD = 'xfvdcfnkfriprpol'
 
 def send_email(to_emails, subject, body, filename):
     msg = MIMEMultipart()
@@ -43,12 +43,15 @@ def send_email(to_emails, subject, body, filename):
         part.add_header('Content-Disposition', f'attachment; filename={filename}')
         msg.attach(part)
 
-    # Send the email
+    # Send the email using Yahoo Business SMTP server
     try:
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
+        print(f"Connecting to SMTP server: {SMTP_SERVER}:{SMTP_PORT}...")
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT)  # Use SMTP_SSL for SSL
+        print("Logging in...")
         server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        print("Sending email...")
         server.sendmail(EMAIL_ADDRESS, to_emails, msg.as_string())
+        print("Email sent successfully!")
         server.quit()
         return True
     except Exception as e:
@@ -71,6 +74,13 @@ try:
     print("Your IP address is:", response.text)
 except Exception as e:
     print("Connection failed:", str(e))
+# MySQL Database Configuration
+# db_config = {
+#     "host": "localhost",
+#     "user": "root",
+#     "password": "1234",
+#     "database": "Local_Pump_Info"
+# }
 
 # Database configuration
 db_config = {
@@ -1207,7 +1217,7 @@ def get_pump():
             # Send the PDF via email
             email_subject = "Your Pump Quote"
             email_body = "Please find attached the pump quote."
-            to_emails = [user_email, "michaelkhoury744@gmail.com"]
+            to_emails = [user_email, "quotes@acuflow.com"]
             if send_email(to_emails, email_subject, email_body, pdf_filename):
                 result["email_status"] = "Email sent successfully"
             else:
