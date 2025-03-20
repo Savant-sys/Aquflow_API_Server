@@ -84,10 +84,10 @@ except Exception as e:
 
 # Database configuration
 db_config = {
-    "host": os.getenv("DB_HOST", "132.148.249.113"),
-    "user": os.getenv("DB_USER", "quote"),
-    "password": os.getenv("DB_PASSWORD", ".2zKuI]4#n@V"),
-    "database": os.getenv("DB_NAME", "Quotes_Database_3_13_25")
+    "host": os.getenv("DB_HOST"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "database": os.getenv("DB_NAME")
 }
 
 def get_flange_size_id(psi):
